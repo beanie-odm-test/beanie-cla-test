@@ -1,0 +1,46 @@
+name: CLA
+# Checks that the authors of a pull request signed the Contributor License
+# Agreement on the signing page. See planning/licensing/CLA-SETUP.md and
+# issues #85 and #86.
+#
+# This workflow uses pull_request_target, so it has a token with write access
+# and the secrets even for pull requests from forks. That is safe only because
+# it NEVER checks out or runs code from the pull request. It checks out the
+# base branch, and it reads the pull request only through the GitHub API.
+# Do not add a step that runs code from the pull request.
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  pull-requests: write
+  statuses: write
+
+concurrency:
+  group: cla-${{ github.event.pull_request.number || github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  cla:
+    # Comments: only on pull requests, and only the comment 'recheck'.
+    if: >-
+      github.event_name == 'pull_request_target' ||
+      (github.event.issue.pull_request &&
+      github.event.comment.body == 'recheck')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: check the CLA
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CLA_API_TOKEN: ${{ secrets.CLA_API_TOKEN }}
+          CLA_SERVICE_URL: ${{ vars.CLA_SERVICE_URL }}
+          CLA_ALLOWLIST: ${{ vars.CLA_ALLOWLIST }}
+          PYTHONPATH: .github/scripts
+        run: python .github/scripts/cla/main.py
